@@ -3,817 +3,786 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TrashScan — Garbage Classifier</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>TrashScan — Garbage Classifier | AI Waste Sorting</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.10.0/tf.min.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
-
-    :root {
-      --bg: #0f1117;
-      --surface: #1a1d27;
-      --border: #2a2d3a;
-      --accent: #4ade80;
-      --accent-dim: #166534;
-      --accent2: #60a5fa;
-      --accent2-dim: #1e3a5f;
-      --text: #e8eaf0;
-      --muted: #6b7280;
-      --warning: #fbbf24;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
 
     * {
-      box-sizing: border-box;
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
     }
 
     body {
-      background: var(--bg);
-      color: var(--text);
+      background: #0b0e14;
       font-family: 'DM Sans', sans-serif;
-      min-height: 100vh;
+      color: #edf2f8;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 2rem 1rem;
+      justify-content: center;
+      padding: 1.8rem 1rem;
+    }
+
+    /* main container */
+    .app-container {
+      max-width: 700px;
+      width: 100%;
     }
 
     header {
       text-align: center;
-      margin-bottom: 2rem;
+      margin-bottom: 1.8rem;
     }
 
     header h1 {
       font-family: 'Space Mono', monospace;
-      font-size: 2.4rem;
-      font-weight: 700;
+      font-size: 2.2rem;
+      background: linear-gradient(135deg, #a3e635, #4ade80);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
       letter-spacing: -1px;
-      color: var(--accent);
     }
 
-    header p {
-      color: var(--muted);
-      font-size: 0.95rem;
-      margin-top: 0.4rem;
+    .badge-row {
+      display: flex;
+      justify-content: center;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+      margin: 0.6rem 0 0.2rem;
     }
 
     .badge {
-      display: inline-block;
-      background: var(--accent-dim);
-      color: var(--accent);
-      font-family: 'Space Mono', monospace;
+      background: #1e293b;
+      padding: 0.2rem 0.9rem;
+      border-radius: 30px;
       font-size: 0.7rem;
-      padding: 2px 10px;
-      border-radius: 99px;
-      margin-top: 0.5rem;
-      letter-spacing: 1px;
+      font-family: 'Space Mono', monospace;
+      color: #94a3b8;
     }
 
+    /* cards */
     .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem;
-      width: 100%;
-      max-width: 600px;
+      background: #111827;
+      border: 1px solid #1f2a3e;
+      border-radius: 28px;
+      padding: 1.6rem 1.4rem;
       margin-bottom: 1.5rem;
+      box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.5);
+      transition: all 0.2s;
     }
 
     .card h2 {
       font-family: 'Space Mono', monospace;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       letter-spacing: 2px;
-      color: var(--muted);
+      color: #9ca3af;
       text-transform: uppercase;
-      margin-bottom: 1.2rem;
+      margin-bottom: 1rem;
+      border-left: 3px solid #4ade80;
+      padding-left: 10px;
     }
 
-    /* Model Selector */
-    .model-selector {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
-      margin-bottom: 1.2rem;
+    /* model selector grid */
+    .model-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin-bottom: 1.8rem;
     }
 
-    .model-btn {
-      padding: 0.9rem 0.5rem;
-      border-radius: 12px;
-      border: 2px solid var(--border);
-      background: transparent;
-      color: var(--muted);
-      font-family: 'Space Mono', monospace;
-      font-size: 0.72rem;
+    .model-card {
+      flex: 1;
+      background: #0f172a;
+      border: 1.5px solid #1e293b;
+      border-radius: 20px;
+      padding: 0.8rem 0.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .model-card:hover {
+      border-color: #4ade80;
+      background: #1e2a3a;
+    }
+
+    .model-card.active-cnn {
+      border-color: #4ade80;
+      background: rgba(74, 222, 128, 0.08);
+      box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.3);
+    }
+
+    .model-card.active-mobilenet {
+      border-color: #60a5fa;
+      background: rgba(96, 165, 250, 0.08);
+      box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.3);
+    }
+
+    .model-card.active-tuned {
+      border-color: #f472b6;
+      background: rgba(244, 114, 182, 0.08);
+      box-shadow: 0 0 0 2px rgba(244, 114, 182, 0.3);
+    }
+
+    .model-icon {
+      font-size: 1.8rem;
+      display: block;
+    }
+
+    .model-name {
       font-weight: 700;
-      letter-spacing: 0.5px;
+      font-size: 0.85rem;
+      margin: 0.3rem 0 0.2rem;
+    }
+
+    .model-desc {
+      font-size: 0.65rem;
+      color: #6b7280;
+    }
+
+    /* dropzone */
+    .dropzone {
+      border: 2px dashed #334155;
+      border-radius: 24px;
+      padding: 2rem 1rem;
+      text-align: center;
       cursor: pointer;
       transition: all 0.2s;
-      text-align: center;
-      line-height: 1.5;
+      margin-top: 0.5rem;
     }
 
-    .model-btn:hover {
-      border-color: var(--accent);
-      color: var(--text);
+    .dropzone.drag-over {
+      border-color: #4ade80;
+      background: #1a2a2a;
     }
 
-    .model-btn.active-cnn {
-      border-color: var(--accent);
-      background: rgba(74, 222, 128, 0.08);
-      color: var(--accent);
-    }
-
-    .model-btn.active-mobile {
-      border-color: var(--accent2);
-      background: rgba(96, 165, 250, 0.08);
-      color: var(--accent2);
-    }
-
-    .model-btn .model-icon {
-      font-size: 1.4rem;
-      display: block;
-      margin-bottom: 0.3rem;
-    }
-
-    .model-btn .model-name {
-      display: block;
-      font-size: 0.78rem;
-    }
-
-    .model-btn .model-desc {
-      display: block;
-      font-size: 0.65rem;
-      color: var(--muted);
-      margin-top: 0.15rem;
-      font-family: 'DM Sans', sans-serif;
-      font-weight: 400;
-    }
-
-    /* Drop Zone */
-    .drop-zone {
-      border: 2px dashed var(--border);
-      border-radius: 12px;
-      padding: 2.5rem 1rem;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-      position: relative;
-    }
-
-    .drop-zone:hover,
-    .drop-zone.dragover {
-      border-color: var(--accent);
-      background: rgba(74, 222, 128, 0.04);
-    }
-
-    .drop-zone input[type="file"] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-      width: 100%;
-      height: 100%;
+    .dropzone p {
+      color: #9ca3af;
+      font-size: 0.9rem;
     }
 
     .drop-icon {
       font-size: 2.5rem;
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.5rem;
     }
 
-    .drop-zone p {
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
-
-    .drop-zone span {
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    /* Preview */
-    #preview-wrap {
+    #previewContainer {
       display: none;
       margin-top: 1.2rem;
       text-align: center;
     }
 
-    #preview-wrap img {
-      max-height: 240px;
+    #previewImg {
+      max-height: 210px;
       max-width: 100%;
-      border-radius: 10px;
-      border: 1px solid var(--border);
+      border-radius: 16px;
+      border: 1px solid #334155;
       object-fit: contain;
+      background: #00000022;
     }
 
-    .img-label {
-      font-size: 0.78rem;
-      color: var(--muted);
-      margin-top: 0.4rem;
-      font-family: 'Space Mono', monospace;
-    }
-
-    /* Classify Button */
-    #classify-btn {
+    .classify-btn {
       width: 100%;
-      padding: 0.85rem;
-      background: var(--accent);
-      color: #0f1117;
+      margin-top: 1.4rem;
+      background: linear-gradient(95deg, #3b82f6, #10b981);
       border: none;
-      border-radius: 10px;
+      padding: 0.9rem;
       font-family: 'Space Mono', monospace;
       font-weight: 700;
-      font-size: 0.95rem;
-      letter-spacing: 1px;
+      font-size: 0.9rem;
+      letter-spacing: 1.5px;
+      color: #0f172a;
+      border-radius: 40px;
       cursor: pointer;
-      margin-top: 1.2rem;
-      transition: opacity 0.2s, transform 0.1s, background 0.2s;
+      transition: 0.2s;
     }
 
-    #classify-btn.mobile {
-      background: var(--accent2);
-    }
-
-    #classify-btn:hover:not(:disabled) {
-      opacity: 0.88;
-      transform: translateY(-1px);
-    }
-
-    #classify-btn:disabled {
+    .classify-btn:disabled {
       opacity: 0.4;
       cursor: not-allowed;
+      background: #334155;
     }
 
-    #status {
-      text-align: center;
-      font-size: 0.85rem;
-      color: var(--muted);
-      min-height: 1.2rem;
-      margin-top: 0.6rem;
+    .status-line {
+      font-size: 0.8rem;
       font-family: 'Space Mono', monospace;
-    }
-
-    /* Model status bar */
-    #model-status {
+      margin-top: 0.6rem;
+      text-align: center;
+      color: #94a3b8;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      font-size: 0.78rem;
-      font-family: 'Space Mono', monospace;
-      color: var(--muted);
-      margin-bottom: 1.5rem;
+      justify-content: center;
+      gap: 8px;
     }
 
-    .dot {
-      width: 8px;
-      height: 8px;
+    .model-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #1e293b;
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.7rem;
+    }
+
+    .led {
+      width: 9px;
+      height: 9px;
       border-radius: 50%;
-      background: var(--warning);
-      animation: pulse 1.5s infinite;
+      background: #facc15;
+      transition: 0.1s;
     }
 
-    .dot.ready {
-      background: var(--accent);
-      animation: none;
+    .led.ready {
+      background: #4ade80;
+      box-shadow: 0 0 4px #4ade80;
     }
 
-    .dot.ready-mobile {
-      background: var(--accent2);
-      animation: none;
+    .led.ready-mobile {
+      background: #60a5fa;
+      box-shadow: 0 0 4px #60a5fa;
     }
 
-    @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1
-      }
-
-      50% {
-        opacity: 0.3
-      }
+    .led.ready-tuned {
+      background: #f472b6;
     }
 
-    /* Results */
-    #results-card {
+    /* results area */
+    .results-panel {
       display: none;
     }
 
     .result-header {
       display: flex;
-      align-items: center;
-      gap: 0.6rem;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid #2d3a4e;
+      padding-bottom: 0.7rem;
       margin-bottom: 1rem;
-      padding-bottom: 0.8rem;
-      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
     }
 
-    .result-model-tag {
+    .model-badge {
       font-family: 'Space Mono', monospace;
-      font-size: 0.68rem;
-      font-weight: 700;
-      padding: 3px 10px;
-      border-radius: 99px;
-      letter-spacing: 1px;
+      font-size: 0.7rem;
+      background: #0f172a;
+      padding: 4px 12px;
+      border-radius: 30px;
     }
 
-    .result-model-tag.cnn {
-      background: rgba(74, 222, 128, 0.12);
-      color: var(--accent);
-      border: 1px solid var(--accent-dim);
-    }
-
-    .result-model-tag.mobile {
-      background: rgba(96, 165, 250, 0.12);
-      color: var(--accent2);
-      border: 1px solid var(--accent2-dim);
-    }
-
-    .result-top {
+    .winner-area {
       display: flex;
       align-items: center;
       gap: 1rem;
       margin-bottom: 1.5rem;
-      padding-bottom: 1.2rem;
-      border-bottom: 1px solid var(--border);
+      background: #0f172a;
+      padding: 0.8rem 1rem;
+      border-radius: 28px;
     }
 
-    .result-emoji {
+    .winner-emoji {
       font-size: 3rem;
     }
 
-    .result-label {
+    .winner-label {
       font-family: 'Space Mono', monospace;
       font-size: 1.6rem;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: -0.5px;
     }
 
-    .result-label.cnn {
-      color: var(--accent);
+    .confidence-text {
+      font-size: 0.8rem;
+      color: #9ca3af;
     }
 
-    .result-label.mobile {
-      color: var(--accent2);
+    .bars-container {
+      margin-top: 1rem;
     }
 
-    .result-conf {
-      font-size: 0.85rem;
-      color: var(--muted);
-      margin-top: 0.2rem;
+    .bar-item {
+      margin-bottom: 0.8rem;
     }
 
-    .result-conf span {
-      color: var(--text);
-      font-weight: 600;
-    }
-
-    /* Bars */
-    .bar-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-    }
-
-    .bar-header {
+    .bar-row {
       display: flex;
       justify-content: space-between;
-      font-size: 0.82rem;
+      font-size: 0.75rem;
       margin-bottom: 3px;
     }
 
-    .bar-name {
-      color: var(--text);
-      font-weight: 500;
-    }
-
-    .bar-pct {
-      color: var(--muted);
-      font-family: 'Space Mono', monospace;
-    }
-
     .bar-track {
-      background: var(--border);
-      border-radius: 99px;
+      background: #1e293b;
+      border-radius: 20px;
       height: 8px;
       overflow: hidden;
     }
 
     .bar-fill {
       height: 100%;
-      border-radius: 99px;
-      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      width: 0%;
+      border-radius: 20px;
+      transition: width 0.55s cubic-bezier(0.2, 0.9, 0.4, 1.1);
     }
 
-    .bar-fill.top-cnn {
-      background: var(--accent);
+    .fill-cnn {
+      background: #4ade80;
     }
 
-    .bar-fill.top-mobile {
-      background: var(--accent2);
+    .fill-mobile {
+      background: #60a5fa;
     }
 
-    .bar-fill.mid {
-      background: var(--warning);
+    .fill-tuned {
+      background: #f472b6;
     }
 
-    .bar-fill.low {
-      background: var(--muted);
+    .fill-mid {
+      background: #fbbf24;
     }
 
-    #tip-box {
+    .fill-low {
+      background: #6b7280;
+    }
+
+    .tip-card {
       margin-top: 1.2rem;
-      padding: 0.85rem 1rem;
-      border-radius: 10px;
-      font-size: 0.85rem;
-      color: var(--text);
-      line-height: 1.6;
-    }
-
-    #tip-box.cnn {
-      background: rgba(74, 222, 128, 0.06);
-      border: 1px solid var(--accent-dim);
-    }
-
-    #tip-box.mobile {
-      background: rgba(96, 165, 250, 0.06);
-      border: 1px solid var(--accent2-dim);
-    }
-
-    #tip-box strong.cnn {
-      color: var(--accent);
-    }
-
-    #tip-box strong.mobile {
-      color: var(--accent2);
-    }
-
-    /* Spinner */
-    .spinner {
-      display: inline-block;
-      width: 14px;
-      height: 14px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    .disclaimer {
-      font-size: 0.75rem;
-      color: var(--muted);
-      text-align: center;
-      margin-top: 1rem;
-      max-width: 560px;
+      padding: 0.8rem 1rem;
+      background: #0f172a;
+      border-radius: 20px;
+      font-size: 0.8rem;
       line-height: 1.5;
+      border-left: 4px solid #4ade80;
+    }
+
+    .disclaimer-note {
+      font-size: 0.7rem;
+      text-align: center;
+      color: #6b7280;
+      margin-top: 1.2rem;
+    }
+
+    code {
+      background: #00000033;
+      padding: 2px 5px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      color: #cbd5e1;
+    }
+
+    .guide {
+      background: #0f172a;
+      border-radius: 20px;
+      padding: 1rem;
+      margin-top: 1rem;
+      font-size: 0.7rem;
+      border: 1px solid #1e293b;
     }
   </style>
 </head>
 
 <body>
+  <div class="app-container">
+    <header>
+      <h1>🗑️ TrashScan</h1>
+      <div class="badge-row">
+        <span class="badge">CNN vs MobileNetV2</span>
+        <span class="badge">TensorFlow.js</span>
+        <span class="badge">10 waste classes</span>
+      </div>
+      <p style="font-size: 0.8rem; margin-top: 8px;">Upload trash photo → AI sorts instantly</p>
+    </header>
 
-  <header>
-    <h1>🗑️ TrashScan</h1>
-    <p>Upload a photo of garbage and classify it using your trained models.</p>
-    <span class="badge">CNN vs MobileNetV2 · TensorFlow.js</span>
-  </header>
+    <!-- Model selection + upload card -->
+    <div class="card">
+      <h2>⚡ 1. SELECT AI ENGINE</h2>
+      <div class="model-grid">
+        <div class="model-card" id="model-cnn-card">
+          <span class="model-icon">🧠</span>
+          <div class="model-name">Custom CNN</div>
+          <div class="model-desc">from scratch</div>
+        </div>
+        <div class="model-card" id="model-mobile-card">
+          <span class="model-icon">⚡</span>
+          <div class="model-name">MobileNetV2</div>
+          <div class="model-desc">transfer learning</div>
+        </div>
+        <div class="model-card" id="model-tuned-card">
+          <span class="model-icon">🚀</span>
+          <div class="model-name">Tuned MobileNet</div>
+          <div class="model-desc">fine-tuned best</div>
+        </div>
+      </div>
 
-  <div id="model-status">
-    <div class="dot" id="status-dot"></div>
-    <span id="model-status-text">Select a model to begin</span>
-  </div>
+      <h2>📸 2. UPLOAD IMAGE</h2>
+      <div class="dropzone" id="dropzoneEl">
+        <input type="file" id="fileElem" accept="image/jpeg,image/png,image/webp" style="display:none" />
+        <div class="drop-icon">🖼️</div>
+        <p>Drag & drop or <strong style="color:#4ade80;">click to browse</strong></p>
+        <p style="font-size:0.7rem; margin-top:5px;">JPG, PNG, WEBP (max 5MB)</p>
+      </div>
 
-  <!-- Upload + Model Select Card -->
-  <div class="card">
-    <h2>01 — Choose Model</h2>
+      <div id="previewContainer">
+        <img id="previewImg" alt="upload preview">
+        <div style="font-size:0.7rem; margin-top:5px; color:#94a3b8;" id="fileNameLabel"></div>
+      </div>
 
-    <div class="model-selector" style="grid-template-columns: 1fr 1fr 1fr;">
-      <button class="model-btn" id="btn-cnn" onclick="selectModel('cnn')">
-        <span class="model-icon">🧠</span>
-        <span class="model-name">Custom CNN</span>
-        <span class="model-desc">Built from scratch · Baseline model</span>
-      </button>
-      <button class="model-btn" id="btn-mobile" onclick="selectModel('mobilenet')">
-        <span class="model-icon">⚡</span>
-        <span class="model-name">MobileNetV2</span>
-        <span class="model-desc">Transfer learning · Main model</span>
-      </button>
-      <button class="model-btn" id="btn-tuned" onclick="selectModel('tuned')">
-        <span class="model-icon">🚀</span>
-        <span class="model-name">MobileNetV2 Tuned</span>
-        <span class="model-desc">Fine-tuned · Best accuracy</span>
-      </button>
-    </div>
-
-    <h2>02 — Upload Image</h2>
-    <div class="drop-zone" id="drop-zone">
-      <input type="file" id="file-input" accept="image/*" />
-      <div class="drop-icon">📁</div>
-      <p><span>Click to upload</span> or drag & drop</p>
-      <p style="font-size:0.78rem; margin-top:0.3rem;">JPG, PNG, WEBP supported</p>
-    </div>
-
-    <div id="preview-wrap">
-      <img id="preview-img" src="" alt="preview" />
-      <div class="img-label" id="img-label">—</div>
-    </div>
-
-    <button id="classify-btn" disabled>SELECT A MODEL FIRST</button>
-    <div id="status"></div>
-  </div>
-
-  <!-- Results Card -->
-  <div class="card" id="results-card">
-    <h2>03 — Result</h2>
-
-    <div class="result-header">
-      <span>Classified using:</span>
-      <span class="result-model-tag" id="result-model-tag">—</span>
-    </div>
-
-    <div class="result-top">
-      <div class="result-emoji" id="result-emoji">♻️</div>
-      <div>
-        <div class="result-label" id="result-label">—</div>
-        <div class="result-conf">Confidence: <span id="result-conf">—</span></div>
+      <button id="classifyActionBtn" class="classify-btn" disabled>🔍 SELECT MODEL FIRST</button>
+      <div class="status-line" id="globalStatus">
+        <span class="led" id="modelLed"></span>
+        <span id="statusMsg">No model loaded</span>
       </div>
     </div>
 
-    <div class="bar-list" id="bar-list"></div>
-    <div id="tip-box"></div>
-  </div>
+    <!-- Results card -->
+    <div class="card results-panel" id="resultsCard">
+      <h2>📊 3. CLASSIFICATION REPORT</h2>
+      <div class="result-header">
+        <span>inference with</span>
+        <span class="model-badge" id="activeModelBadge">—</span>
+      </div>
+      <div class="winner-area" id="winnerArea">
+        <div class="winner-emoji" id="winnerEmoji">♻️</div>
+        <div>
+          <div class="winner-label" id="winnerLabel">—</div>
+          <div class="confidence-text">Confidence: <strong id="confidenceValue">0%</strong></div>
+        </div>
+      </div>
+      <div class="bars-container" id="barsContainer"></div>
+      <div class="tip-card" id="tipContainer">
+        💡 <span id="tipText">Classification insights appear here</span>
+      </div>
+    </div>
 
-  <p class="disclaimer">
-    Trained on the Garbage Classification V2 dataset (~13,000 images, 10 classes).
-    For demo and educational purposes only.
-  </p>
-
-  <div
-    style="max-width:600px; margin-top:1.5rem; padding:1rem 1.2rem; background:#1a1d27; border:1px solid #2a2d3a; border-radius:12px; font-size:0.8rem; color:#6b7280; line-height:1.7;">
-    <strong style="color:#e8eaf0; font-family:'Space Mono',monospace; font-size:0.75rem;">⚙️ SETUP NOTE</strong><br><br>
-    Convert both models after training:<br>
-    <code
-      style="background:#0f1117; padding:2px 6px; border-radius:4px; color:#4ade80;">tensorflowjs_converter --input_format=keras garbage_model_best.h5 ./tfjs_cnn</code><br>
-    <code
-      style="background:#0f1117; padding:2px 6px; border-radius:4px; color:#60a5fa;">tensorflowjs_converter --input_format=keras mobilenet_model_best.h5 ./tfjs_mobilenet</code><br><br>
-    Place both folders next to this HTML file. Update <code style="color:#4ade80;">CNN_MODEL_URL</code> and <code
-      style="color:#60a5fa;">MOBILE_MODEL_URL</code> in the script.
+    <div class="guide">
+      <strong>⚙️ Model setup (for developers)</strong><br>
+      After training, convert models with:<br>
+      <code>tensorflowjs_converter --input_format=keras garbage_model_best.h5 ./tfjs_cnn</code><br>
+      <code>tensorflowjs_converter --input_format=keras mobilenet_model_best.h5 ./tfjs_mobilenet</code><br>
+      <code>tensorflowjs_converter --input_format=keras tuned_model.h5 ./tfjs_mobilenet_tune</code><br>
+      Place folders next to index.html and update URLs in script.
+    </div>
+    <p class="disclaimer-note">♻️ Trained on Garbage Classification V2 (10 classes). Educational demo — always verify local recycling rules.</p>
   </div>
 
   <script>
-    // ─── CONFIG ─────────────────────────────────────────────────────────────────
-    const CNN_MODEL_URL = './tfjs_cnn/garbage_model_final_architecture.json';       // <-- update after converting
-    const MOBILE_MODEL_URL = './tfjs_mobilenet/mobV2_garbage_model_final_architecture.json'; // <-- update after converting
-    const TUNED_MODEL_URL = './tfjs_mobilenet_tune/mobV2_garbage_modelV2withtune_final_architecture.json'; // use the tuned TF.js manifest file present in the folder
+    // ------------------------- CONFIGURATION ----------------------------------
+    // UPDATE THESE PATHS AFTER CONVERTING YOUR MODELS (relative to HTML file)
+    const CNN_MODEL_PATH = './tfjs_cnn/garbage_model_final_architecture.json';        // custom CNN
+    const MOBILE_MODEL_PATH = './tfjs_mobilenet/mobV2_garbage_model_final_architecture.json';   // MobileNetV2
+    const TUNED_MODEL_PATH = './tfjs_mobilenet_tune/mobV2_garbage_modelV2withtune_final_architecture.json'; // Tuned variant
 
-    const CLASS_NAMES = ['battery', 'biological', 'cardboard', 'clothes', 'glass', 'metal', 'paper', 'plastic', 'shoes', 'trash'];
-
-    const TIPS = {
-      cardboard: '📦 <strong>Cardboard</strong> — Flatten boxes before recycling. Keep dry.',
-      glass: '🍶 <strong>Glass</strong> — Rinse containers. Glass is 100% recyclable.',
-      metal: '🥫 <strong>Metal</strong> — Rinse cans. Aluminum and steel are highly valuable.',
-      paper: '📄 <strong>Paper</strong> — Separate from food waste before recycling.',
-      plastic: '🧴 <strong>Plastic</strong> — Check the resin code (1–7) on the bottom.',
-      trash: '🗑️ <strong>General Trash</strong> — May not be recyclable. Use general waste bin.',
-      battery: '🔋 <strong>Battery</strong> — Needs special recycling. Never put in general trash.',
-      biological: '🧬 <strong>Biological</strong> — Dispose safely per local bio-waste guidelines.',
-      clothes: '👕 <strong>Clothes</strong> — Donate usable garments or recycle textile waste.',
-      shoes: '👟 <strong>Shoes</strong> — Often recyclable through special programs.'
+    const CLASS_LABELS = ['battery', 'biological', 'cardboard', 'clothes', 'glass', 'metal', 'paper', 'plastic', 'shoes', 'trash'];
+    
+    // rich tips & emojis
+    const TIPS_MAP = {
+      battery: '🔋 <strong>Battery</strong> — Hazardous waste. Never bin in regular trash. Use e-waste collection.',
+      biological: '🧬 <strong>Biological waste</strong> — Follow local biohazard protocols. Not for recycling bin.',
+      cardboard: '📦 <strong>Cardboard</strong> — Flatten & keep dry. Remove tape if possible.',
+      clothes: '👕 <strong>Clothes</strong> — Donate or textile recycling. Avoid landfill.',
+      glass: '🍶 <strong>Glass</strong> — Rinse & sort by color. 100% recyclable.',
+      metal: '🥫 <strong>Metal</strong> — Rinse cans. Aluminum/steel highly recyclable.',
+      paper: '📄 <strong>Paper</strong> — Keep clean & dry. No food residue.',
+      plastic: '🧴 <strong>Plastic</strong> — Check resin code. Soft plastics go to special bins.',
+      shoes: '👟 <strong>Shoes</strong> — Reuse or donate. Some brands accept recycling.',
+      trash: '🗑️ <strong>General trash</strong> — Non-recyclable waste. Landfill.'
+    };
+    const EMOJI_MAP = {
+      battery: '🔋', biological: '🧬', cardboard: '📦', clothes: '👕', glass: '🍶',
+      metal: '🥫', paper: '📄', plastic: '🧴', shoes: '👟', trash: '🗑️'
     };
 
-    const EMOJIS = {
-      battery: '🔋', biological: '🧬', cardboard: '📦',
-      clothes: '👕', glass: '🍶', metal: '🥫',
-      paper: '📄', plastic: '🧴', shoes: '👟', trash: '🗑️'
-    };
+    // global state
+    let cnnModelInstance = null;
+    let mobileModelInstance = null;
+    let tunedModelInstance = null;
+    let currentActiveModel = null;        // 'cnn' | 'mobilenet' | 'tuned'
+    let currentImageFile = null;
+    let previewImageElement = null;
+    let isModelReady = { cnn: false, mobilenet: false, tuned: false };
+    
+    // DOM elements
+    const cnnCard = document.getElementById('model-cnn-card');
+    const mobileCard = document.getElementById('model-mobile-card');
+    const tunedCard = document.getElementById('model-tuned-card');
+    const classifyBtn = document.getElementById('classifyActionBtn');
+    const dropZoneDiv = document.getElementById('dropzoneEl');
+    const fileInput = document.getElementById('fileElem');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewImg = document.getElementById('previewImg');
+    const fileNameSpan = document.getElementById('fileNameLabel');
+    const resultsCard = document.getElementById('resultsCard');
+    const statusMsgSpan = document.getElementById('statusMsg');
+    const modelLed = document.getElementById('modelLed');
+    const activeModelBadge = document.getElementById('activeModelBadge');
+    const winnerEmojiSpan = document.getElementById('winnerEmoji');
+    const winnerLabelSpan = document.getElementById('winnerLabel');
+    const confidenceSpan = document.getElementById('confidenceValue');
+    const barsContainer = document.getElementById('barsContainer');
+    const tipContainerSpan = document.getElementById('tipText');
+    const globalStatusDiv = document.getElementById('globalStatus');
 
-    // ─── STATE ──────────────────────────────────────────────────────────────────
-    let cnnModel = null;
-    let mobileModel = null;
-    let tunedModel = null;
-    let activeModel = null;   // 'cnn' | 'mobilenet' | 'tuned'
-    let modelReady = { cnn: false, mobilenet: false, tuned: false };
-    let selectedFile = null;
-
-    // ─── ELEMENTS ───────────────────────────────────────────────────────────────
-    const dropZone = document.getElementById('drop-zone');
-    const fileInput = document.getElementById('file-input');
-    const previewWrap = document.getElementById('preview-wrap');
-    const previewImg = document.getElementById('preview-img');
-    const imgLabel = document.getElementById('img-label');
-    const classifyBtn = document.getElementById('classify-btn');
-    const statusEl = document.getElementById('status');
-    const resultsCard = document.getElementById('results-card');
-    const resultEmoji = document.getElementById('result-emoji');
-    const resultLabel = document.getElementById('result-label');
-    const resultConf = document.getElementById('result-conf');
-    const resultModelTag = document.getElementById('result-model-tag');
-    const barList = document.getElementById('bar-list');
-    const tipBox = document.getElementById('tip-box');
-    const statusDot = document.getElementById('status-dot');
-    const modelStatusText = document.getElementById('model-status-text');
-
-    // ─── MODEL SELECTION ────────────────────────────────────────────────────────
-    async function selectModel(which) {
-      activeModel = which;
-
-      document.getElementById('btn-cnn').className = 'model-btn' + (which === 'cnn' ? ' active-cnn' : '');
-      document.getElementById('btn-mobile').className = 'model-btn' + (which === 'mobilenet' ? ' active-mobile' : '');
-      document.getElementById('btn-tuned').className = 'model-btn' + (which === 'tuned' ? ' active-tuned' : '');
-
-      resultsCard.style.display = 'none';
-      statusEl.textContent = '';
-      classifyBtn.disabled = true;
-
-      if (which === 'cnn') {
-        classifyBtn.textContent = 'CLASSIFY WITH CNN';
-        modelReady.cnn = !!cnnModel;
-
-        if (!cnnModel) {
-          modelStatusText.textContent = 'Loading Custom CNN...';
-          statusDot.className = 'dot';
-
-          try {
-            cnnModel = await tf.loadLayersModel(CNN_MODEL_URL);
-            modelReady.cnn = true;
-            statusDot.className = 'dot ready';
-            modelStatusText.textContent = 'Custom CNN ready';
-          } catch (e) {
-            modelReady.cnn = false;
-            modelStatusText.textContent = 'CNN failed to load';
-            console.warn(e);
-          }
-        }
+    // helper: update UI after model selection / file
+    function updateClassifyButtonState() {
+      if (!currentImageFile) {
+        classifyBtn.disabled = true;
+        classifyBtn.textContent = '📤 UPLOAD AN IMAGE FIRST';
+        return;
       }
-
-      else if (which === 'mobilenet') {
-        classifyBtn.textContent = 'CLASSIFY WITH MOBILENETV2';
-        modelReady.mobilenet = !!mobileModel;
-
-        if (!mobileModel) {
-          modelStatusText.textContent = 'Loading MobileNetV2...';
-          statusDot.className = 'dot';
-
-          try {
-            mobileModel = await tf.loadLayersModel(MOBILE_MODEL_URL);
-            modelReady.mobilenet = true;
-            statusDot.className = 'dot ready-mobile';
-            modelStatusText.textContent = 'MobileNetV2 ready';
-          } catch (e) {
-            modelReady.mobilenet = false;
-            modelStatusText.textContent = 'MobileNet failed to load';
-            console.warn(e);
-          }
-        }
+      if (!currentActiveModel) {
+        classifyBtn.disabled = true;
+        classifyBtn.textContent = '⚙️ SELECT A MODEL';
+        return;
       }
-
-      else if (which === 'tuned') {
-        classifyBtn.textContent = 'CLASSIFY WITH TUNED MODEL';
-        modelReady.tuned = !!tunedModel;
-
-        if (!tunedModel) {
-          modelStatusText.textContent = 'Loading Tuned Model...';
-          statusDot.className = 'dot';
-
-          try {
-            tunedModel = await tf.loadLayersModel(TUNED_MODEL_URL);
-            modelReady.tuned = true;
-            statusDot.style.background = '#f472b6';
-            statusDot.style.animation = 'none';
-            modelStatusText.textContent = 'Tuned model ready';
-          } catch (e) {
-            modelReady.tuned = false;
-            modelStatusText.textContent = 'Tuned model failed to load';
-            console.warn(e);
-          }
-        }
+      let modelLoaded = false;
+      if (currentActiveModel === 'cnn') modelLoaded = isModelReady.cnn;
+      else if (currentActiveModel === 'mobilenet') modelLoaded = isModelReady.mobilenet;
+      else if (currentActiveModel === 'tuned') modelLoaded = isModelReady.tuned;
+      
+      if (!modelLoaded) {
+        classifyBtn.disabled = true;
+        classifyBtn.textContent = `⏳ LOADING ${currentActiveModel.toUpperCase()}...`;
+      } else {
+        classifyBtn.disabled = false;
+        classifyBtn.textContent = `🔬 CLASSIFY WITH ${currentActiveModel === 'cnn' ? 'CNN' : (currentActiveModel === 'mobilenet' ? 'MOBILENETV2' : 'TUNED MODEL')}`;
       }
-
-      classifyBtn.disabled = !selectedFile || !modelReady[which];
     }
 
-    // ─── FILE HANDLING ──────────────────────────────────────────────────────────
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault(); dropZone.classList.remove('dragover');
+    // load model on demand when selected
+    async function loadModelIfNeeded(modelType) {
+      if (modelType === 'cnn' && !cnnModelInstance && !isModelReady.cnn) {
+        statusMsgSpan.innerText = 'Loading Custom CNN ...';
+        modelLed.className = 'led';
+        try {
+          cnnModelInstance = await tf.loadLayersModel(CNN_MODEL_PATH);
+          isModelReady.cnn = true;
+          statusMsgSpan.innerText = '✅ CNN ready';
+          modelLed.className = 'led ready';
+        } catch (err) {
+          console.error('CNN load error', err);
+          isModelReady.cnn = false;
+          statusMsgSpan.innerText = '❌ CNN failed (check path)';
+          modelLed.className = 'led';
+        }
+      }
+      else if (modelType === 'mobilenet' && !mobileModelInstance && !isModelReady.mobilenet) {
+        statusMsgSpan.innerText = 'Loading MobileNetV2 ...';
+        modelLed.className = 'led';
+        try {
+          mobileModelInstance = await tf.loadLayersModel(MOBILE_MODEL_PATH);
+          isModelReady.mobilenet = true;
+          statusMsgSpan.innerText = '✅ MobileNetV2 ready';
+          modelLed.className = 'led ready-mobile';
+        } catch (err) {
+          console.error('MobileNet load error', err);
+          isModelReady.mobilenet = false;
+          statusMsgSpan.innerText = '❌ MobileNet failed';
+        }
+      }
+      else if (modelType === 'tuned' && !tunedModelInstance && !isModelReady.tuned) {
+        statusMsgSpan.innerText = 'Loading Tuned Model ...';
+        modelLed.className = 'led';
+        try {
+          tunedModelInstance = await tf.loadLayersModel(TUNED_MODEL_PATH);
+          isModelReady.tuned = true;
+          statusMsgSpan.innerText = '✅ Tuned model ready';
+          modelLed.className = 'led ready-tuned';
+        } catch (err) {
+          console.error('Tuned model load error', err);
+          isModelReady.tuned = false;
+          statusMsgSpan.innerText = '❌ Tuned model missing';
+        }
+      }
+      updateClassifyButtonState();
+    }
+
+    // set active model style & load
+    function setActiveModel(modelKey) {
+      currentActiveModel = modelKey;
+      // update card styles
+      cnnCard.classList.remove('active-cnn', 'active-mobilenet', 'active-tuned');
+      mobileCard.classList.remove('active-cnn', 'active-mobilenet', 'active-tuned');
+      tunedCard.classList.remove('active-cnn', 'active-mobilenet', 'active-tuned');
+      if (modelKey === 'cnn') cnnCard.classList.add('active-cnn');
+      else if (modelKey === 'mobilenet') mobileCard.classList.add('active-mobilenet');
+      else if (modelKey === 'tuned') tunedCard.classList.add('active-tuned');
+      
+      // Update badge in results if needed
+      if (modelKey === 'cnn') activeModelBadge.innerText = 'Custom CNN';
+      else if (modelKey === 'mobilenet') activeModelBadge.innerText = 'MobileNetV2';
+      else activeModelBadge.innerText = 'Tuned MobileNetV2';
+      
+      // trigger load if not ready
+      loadModelIfNeeded(modelKey);
+      updateClassifyButtonState();
+    }
+
+    // Image handling
+    function handleSelectedImage(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        statusMsgSpan.innerText = 'Please select a valid image file';
+        return;
+      }
+      currentImageFile = file;
+      const objectUrl = URL.createObjectURL(file);
+      previewImg.src = objectUrl;
+      previewContainer.style.display = 'block';
+      fileNameSpan.innerText = `${file.name} · ${(file.size / 1024).toFixed(0)} KB`;
+      resultsCard.style.display = 'none';
+      updateClassifyButtonState();
+      statusMsgSpan.innerText = currentActiveModel ? `Ready to classify (${currentActiveModel})` : 'Select model & classify';
+    }
+
+    // drop zone logic
+    dropZoneDiv.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) handleSelectedImage(e.target.files[0]);
+    });
+    dropZoneDiv.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZoneDiv.classList.add('drag-over');
+    });
+    dropZoneDiv.addEventListener('dragleave', () => dropZoneDiv.classList.remove('drag-over'));
+    dropZoneDiv.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZoneDiv.classList.remove('drag-over');
       const file = e.dataTransfer.files[0];
-      if (file && file.type.startsWith('image/')) handleFile(file);
+      if (file && file.type.startsWith('image/')) handleSelectedImage(file);
+      else statusMsgSpan.innerText = 'Only image files allowed';
     });
-    fileInput.addEventListener('change', (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); });
 
-    function handleFile(file) {
-      selectedFile = file;
-      previewImg.src = URL.createObjectURL(file);
-      previewWrap.style.display = 'block';
-      imgLabel.textContent = `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
-      resultsCard.style.display = 'none';
-      statusEl.textContent = '';
-      classifyBtn.disabled = !activeModel || !modelReady[activeModel];
-      if (!activeModel) classifyBtn.textContent = 'SELECT A MODEL FIRST';
-    }
-
-    // ─── CLASSIFY ───────────────────────────────────────────────────────────────
-    classifyBtn.addEventListener('click', async () => {
-      if (!selectedFile || !activeModel) return;
-
-      classifyBtn.disabled = true;
-      statusEl.innerHTML = '<span class="spinner"></span>Classifying...';
-      resultsCard.style.display = 'none';
-
-      await new Promise(r => setTimeout(r, 50));
-
-      try {
-        let probs;
-        let currentModel;
-        if (activeModel === 'cnn') currentModel = cnnModel;
-        else if (activeModel === 'mobilenet') currentModel = mobileModel;
-        else if (activeModel === 'tuned') currentModel = tunedModel;
-
-        if (currentModel) {
-          const tensor = tf.tidy(() =>
-            tf.browser.fromPixels(previewImg)
-              .resizeBilinear([224, 224])
-              .toFloat().div(255.0).expandDims(0)
-          );
-          const pred = currentModel.predict(tensor);
-          probs = await pred.data();
-          tensor.dispose(); pred.dispose();
-        } else {
-          statusEl.textContent = 'Model not loaded. Please select a model again.';
-          classifyBtn.disabled = false;
-          return;
-        }
-
-        showResults(probs, activeModel);
-        statusEl.textContent = '';
-      } catch (err) {
-        statusEl.textContent = 'Error during classification. Check console.';
-        console.error(err);
+    // classification core
+    async function runClassification() {
+      if (!currentImageFile || !currentActiveModel) return;
+      let modelToUse = null;
+      if (currentActiveModel === 'cnn') modelToUse = cnnModelInstance;
+      else if (currentActiveModel === 'mobilenet') modelToUse = mobileModelInstance;
+      else if (currentActiveModel === 'tuned') modelToUse = tunedModelInstance;
+      
+      if (!modelToUse) {
+        statusMsgSpan.innerText = 'Model not loaded yet, try again in a moment.';
+        return;
       }
-
-      classifyBtn.disabled = false;
-    });
-
-    // ─── DISPLAY RESULTS ────────────────────────────────────────────────────────
-    function showResults(probs, which) {
-      let colorClass = 'mobile';
-      if (which === 'cnn') colorClass = 'cnn';
-      else if (which === 'tuned') colorClass = 'tuned';
-      const indexed = CLASS_NAMES.map((name, i) => ({ name, prob: probs[i] }));
-      indexed.sort((a, b) => b.prob - a.prob);
-      const top = indexed[0];
-
-      // Model tag
-      resultModelTag.textContent =
-        which === 'cnn' ? 'Custom CNN' :
-          which === 'mobilenet' ? 'MobileNetV2' :
-            'MobileNetV2 Tuned';
-      resultModelTag.className = `result-model-tag ${colorClass}`;
-
-      resultEmoji.textContent = EMOJIS[top.name] || '♻️';
-      resultLabel.textContent = top.name;
-      resultLabel.className = `result-label ${colorClass}`;
-      resultConf.textContent = `${(top.prob * 100).toFixed(1)}%`;
-
-      tipBox.className = `tip-box ${colorClass}`;
-      const tipText = TIPS[top.name] || '';
-      tipBox.innerHTML = tipText.replace('<strong>', `<strong class="${colorClass}">`);
-
-      barList.innerHTML = '';
-      indexed.forEach((item, rank) => {
-        const pct = (item.prob * 100).toFixed(1);
-        const fillClass = rank === 0 ? `top-${colorClass}` : rank <= 2 ? 'mid' : 'low';
-        barList.innerHTML += `
-        <div class="bar-item">
-          <div class="bar-header">
-            <span class="bar-name">${EMOJIS[item.name]} ${item.name}</span>
-            <span class="bar-pct">${pct}%</span>
-          </div>
-          <div class="bar-track">
-            <div class="bar-fill ${fillClass}" style="width:0%" data-target="${pct}"></div>
-          </div>
-        </div>`;
-      });
-
-      resultsCard.style.display = 'block';
-      requestAnimationFrame(() => {
-        document.querySelectorAll('.bar-fill').forEach(bar => {
-          bar.style.width = bar.dataset.target + '%';
+      
+      classifyBtn.disabled = true;
+      classifyBtn.textContent = '🧠 ANALYZING WASTE ...';
+      statusMsgSpan.innerHTML = '<span class="spinner" style="display:inline-block;width:12px;height:12px;border:2px solid #4ade80;border-top-color:transparent;border-radius:50%;animation:spin 0.6s linear infinite;margin-right:6px;"></span> Classifying...';
+      
+      try {
+        // preprocess: resize to 224x224, normalize 0-1
+        const imgTensor = tf.tidy(() => {
+          const imgElement = previewImg;
+          let tensor = tf.browser.fromPixels(imgElement);
+          tensor = tensor.resizeBilinear([224, 224]);
+          tensor = tensor.toFloat().div(255.0);
+          tensor = tensor.expandDims(0);
+          return tensor;
         });
-      });
+        const predictions = modelToUse.predict(imgTensor);
+        const probsArray = await predictions.data();
+        imgTensor.dispose();
+        predictions.dispose();
+        
+        // map to classes
+        const probMap = CLASS_LABELS.map((label, idx) => ({ label, prob: probsArray[idx] }));
+        probMap.sort((a,b) => b.prob - a.prob);
+        const top = probMap[0];
+        
+        // display results card
+        resultsCard.style.display = 'block';
+        const activeColorStyle = currentActiveModel === 'cnn' ? 'fill-cnn' : (currentActiveModel === 'mobilenet' ? 'fill-mobile' : 'fill-tuned');
+        winnerEmojiSpan.innerText = EMOJI_MAP[top.label] || '♻️';
+        winnerLabelSpan.innerText = top.label;
+        const confidencePercent = (top.prob * 100).toFixed(1);
+        confidenceSpan.innerText = `${confidencePercent}%`;
+        
+        // update tip text
+        let tipHtml = TIPS_MAP[top.label] || '♻️ Recycle responsibly. Check local guidelines.';
+        tipContainerSpan.innerHTML = tipHtml;
+        
+        // build bars
+        barsContainer.innerHTML = '';
+        for (let i = 0; i < probMap.length; i++) {
+          const item = probMap[i];
+          const pct = (item.prob * 100).toFixed(1);
+          let barFillClass = activeColorStyle;
+          if (i !== 0) {
+            barFillClass = (i <= 2) ? 'fill-mid' : 'fill-low';
+          }
+          const barDiv = document.createElement('div');
+          barDiv.className = 'bar-item';
+          barDiv.innerHTML = `
+            <div class="bar-row">
+              <span>${EMOJI_MAP[item.label] || '🗑️'} ${item.label}</span>
+              <span>${pct}%</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill ${barFillClass}" style="width:0%" data-target="${pct}"></div>
+            </div>
+          `;
+          barsContainer.appendChild(barDiv);
+        }
+        // animate bars
+        requestAnimationFrame(() => {
+          document.querySelectorAll('#barsContainer .bar-fill').forEach(bar => {
+            const target = bar.getAttribute('data-target');
+            if (target) bar.style.width = target + '%';
+          });
+        });
+        
+        statusMsgSpan.innerText = `✅ Classified as ${top.label} (${confidencePercent}%)`;
+      } catch (err) {
+        console.error('classify error', err);
+        statusMsgSpan.innerText = 'Error during classification. Check console or model paths.';
+        resultsCard.style.display = 'none';
+      } finally {
+        classifyBtn.disabled = false;
+        updateClassifyButtonState();
+      }
     }
+    
+    classifyBtn.addEventListener('click', () => {
+      if (!currentImageFile) {
+        statusMsgSpan.innerText = 'Please upload an image first.';
+        return;
+      }
+      if (!currentActiveModel) {
+        statusMsgSpan.innerText = 'Select a model (CNN / MobileNet / Tuned)';
+        return;
+      }
+      let modelLoadedFlag = false;
+      if (currentActiveModel === 'cnn') modelLoadedFlag = isModelReady.cnn;
+      else if (currentActiveModel === 'mobilenet') modelLoadedFlag = isModelReady.mobilenet;
+      else modelLoadedFlag = isModelReady.tuned;
+      if (!modelLoadedFlag) {
+        statusMsgSpan.innerText = `Model ${currentActiveModel} is still loading. Wait a moment.`;
+        return;
+      }
+      runClassification();
+    });
+    
+    // event listeners for model selection
+    cnnCard.addEventListener('click', () => setActiveModel('cnn'));
+    mobileCard.addEventListener('click', () => setActiveModel('mobilenet'));
+    tunedCard.addEventListener('click', () => setActiveModel('tuned'));
+    
+    // initial dummy state
+    setActiveModel('mobilenet');  // default preselected MobileNetV2 (common)
+    
+    // extra: add animation keyframes in case missing
+    const styleSheet = document.createElement("style");
+    styleSheet.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`;
+    document.head.appendChild(styleSheet);
+    
+    // Fix for any dynamic file load edge cases: if no image yet, disable classify properly
+    window.addEventListener('load', () => {
+      updateClassifyButtonState();
+    });
   </script>
-
 </body>
 
 </html>
