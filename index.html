@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrashScan — Garbage Classifier</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.10.0/tf.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --border: #2a2d3a;
+      --accent: #4ade80;
+      --accent-dim: #166534;
+      --accent2: #60a5fa;
+      --accent2-dim: #1e3a5f;
+      --text: #e8eaf0;
+      --muted: #6b7280;
+      --warning: #fbbf24;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-family: 'Space Mono', monospace;
+      font-size: 2.4rem;
+      font-weight: 700;
+      letter-spacing: -1px;
+      color: var(--accent);
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-top: 0.4rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      padding: 2px 10px;
+      border-radius: 99px;
+      margin-top: 0.5rem;
+      letter-spacing: 1px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 600px;
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.85rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 1.2rem;
+    }
+
+    /* Model Selector */
+    .model-selector {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .model-btn {
+      padding: 0.9rem 0.5rem;
+      border-radius: 12px;
+      border: 2px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .model-btn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .model-btn.active-cnn {
+      border-color: var(--accent);
+      background: rgba(74, 222, 128, 0.08);
+      color: var(--accent);
+    }
+
+    .model-btn.active-mobile {
+      border-color: var(--accent2);
+      background: rgba(96, 165, 250, 0.08);
+      color: var(--accent2);
+    }
+
+    .model-btn .model-icon {
+      font-size: 1.4rem;
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+
+    .model-btn .model-name {
+      display: block;
+      font-size: 0.78rem;
+    }
+
+    .model-btn .model-desc {
+      display: block;
+      font-size: 0.65rem;
+      color: var(--muted);
+      margin-top: 0.15rem;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 400;
+    }
+
+    /* Drop Zone */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(74, 222, 128, 0.04);
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .drop-zone p {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .drop-zone span {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Preview */
+    #preview-wrap {
+      display: none;
+      margin-top: 1.2rem;
+      text-align: center;
+    }
+
+    #preview-wrap img {
+      max-height: 240px;
+      max-width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      object-fit: contain;
+    }
+
+    .img-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 0.4rem;
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* Classify Button */
+    #classify-btn {
+      width: 100%;
+      padding: 0.85rem;
+      background: var(--accent);
+      color: #0f1117;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 1px;
+      cursor: pointer;
+      margin-top: 1.2rem;
+      transition: opacity 0.2s, transform 0.1s, background 0.2s;
+    }
+
+    #classify-btn.mobile {
+      background: var(--accent2);
+    }
+
+    #classify-btn:hover:not(:disabled) {
+      opacity: 0.88;
+      transform: translateY(-1px);
+    }
+
+    #classify-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    #status {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+      min-height: 1.2rem;
+      margin-top: 0.6rem;
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* Model status bar */
+    #model-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.78rem;
+      font-family: 'Space Mono', monospace;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--warning);
+      animation: pulse 1.5s infinite;
+    }
+
+    .dot.ready {
+      background: var(--accent);
+      animation: none;
+    }
+
+    .dot.ready-mobile {
+      background: var(--accent2);
+      animation: none;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0.3
+      }
+    }
+
+    /* Results */
+    #results-card {
+      display: none;
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .result-model-tag {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 99px;
+      letter-spacing: 1px;
+    }
+
+    .result-model-tag.cnn {
+      background: rgba(74, 222, 128, 0.12);
+      color: var(--accent);
+      border: 1px solid var(--accent-dim);
+    }
+
+    .result-model-tag.mobile {
+      background: rgba(96, 165, 250, 0.12);
+      color: var(--accent2);
+      border: 1px solid var(--accent2-dim);
+    }
+
+    .result-top {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .result-emoji {
+      font-size: 3rem;
+    }
+
+    .result-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 1.6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: -0.5px;
+    }
+
+    .result-label.cnn {
+      color: var(--accent);
+    }
+
+    .result-label.mobile {
+      color: var(--accent2);
+    }
+
+    .result-conf {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+    }
+
+    .result-conf span {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Bars */
+    .bar-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .bar-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      margin-bottom: 3px;
+    }
+
+    .bar-name {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .bar-pct {
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+    }
+
+    .bar-track {
+      background: var(--border);
+      border-radius: 99px;
+      height: 8px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .bar-fill.top-cnn {
+      background: var(--accent);
+    }
+
+    .bar-fill.top-mobile {
+      background: var(--accent2);
+    }
+
+    .bar-fill.mid {
+      background: var(--warning);
+    }
+
+    .bar-fill.low {
+      background: var(--muted);
+    }
+
+    #tip-box {
+      margin-top: 1.2rem;
+      padding: 0.85rem 1rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    #tip-box.cnn {
+      background: rgba(74, 222, 128, 0.06);
+      border: 1px solid var(--accent-dim);
+    }
+
+    #tip-box.mobile {
+      background: rgba(96, 165, 250, 0.06);
+      border: 1px solid var(--accent2-dim);
+    }
+
+    #tip-box strong.cnn {
+      color: var(--accent);
+    }
+
+    #tip-box strong.mobile {
+      color: var(--accent2);
+    }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .disclaimer {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 1rem;
+      max-width: 560px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>🗑️ TrashScan</h1>
+    <p>Upload a photo of garbage and classify it using your trained models.</p>
+    <span class="badge">CNN vs MobileNetV2 · TensorFlow.js</span>
+  </header>
+
+  <div id="model-status">
+    <div class="dot" id="status-dot"></div>
+    <span id="model-status-text">Select a model to begin</span>
+  </div>
+
+  <!-- Upload + Model Select Card -->
+  <div class="card">
+    <h2>01 — Choose Model</h2>
+
+    <div class="model-selector" style="grid-template-columns: 1fr 1fr 1fr;">
+      <button class="model-btn" id="btn-cnn" onclick="selectModel('cnn')">
+        <span class="model-icon">🧠</span>
+        <span class="model-name">Custom CNN</span>
+        <span class="model-desc">Built from scratch · Baseline model</span>
+      </button>
+      <button class="model-btn" id="btn-mobile" onclick="selectModel('mobilenet')">
+        <span class="model-icon">⚡</span>
+        <span class="model-name">MobileNetV2</span>
+        <span class="model-desc">Transfer learning · Main model</span>
+      </button>
+      <button class="model-btn" id="btn-tuned" onclick="selectModel('tuned')">
+        <span class="model-icon">🚀</span>
+        <span class="model-name">MobileNetV2 Tuned</span>
+        <span class="model-desc">Fine-tuned · Best accuracy</span>
+      </button>
+    </div>
+
+    <h2>02 — Upload Image</h2>
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept="image/*" />
+      <div class="drop-icon">📁</div>
+      <p><span>Click to upload</span> or drag & drop</p>
+      <p style="font-size:0.78rem; margin-top:0.3rem;">JPG, PNG, WEBP supported</p>
+    </div>
+
+    <div id="preview-wrap">
+      <img id="preview-img" src="" alt="preview" />
+      <div class="img-label" id="img-label">—</div>
+    </div>
+
+    <button id="classify-btn" disabled>SELECT A MODEL FIRST</button>
+    <div id="status"></div>
+  </div>
+
+  <!-- Results Card -->
+  <div class="card" id="results-card">
+    <h2>03 — Result</h2>
+
+    <div class="result-header">
+      <span>Classified using:</span>
+      <span class="result-model-tag" id="result-model-tag">—</span>
+    </div>
+
+    <div class="result-top">
+      <div class="result-emoji" id="result-emoji">♻️</div>
+      <div>
+        <div class="result-label" id="result-label">—</div>
+        <div class="result-conf">Confidence: <span id="result-conf">—</span></div>
+      </div>
+    </div>
+
+    <div class="bar-list" id="bar-list"></div>
+    <div id="tip-box"></div>
+  </div>
+
+  <p class="disclaimer">
+    Trained on the Garbage Classification V2 dataset (~13,000 images, 10 classes).
+    For demo and educational purposes only.
+  </p>
+
+  <div
+    style="max-width:600px; margin-top:1.5rem; padding:1rem 1.2rem; background:#1a1d27; border:1px solid #2a2d3a; border-radius:12px; font-size:0.8rem; color:#6b7280; line-height:1.7;">
+    <strong style="color:#e8eaf0; font-family:'Space Mono',monospace; font-size:0.75rem;">⚙️ SETUP NOTE</strong><br><br>
+    Convert both models after training:<br>
+    <code
+      style="background:#0f1117; padding:2px 6px; border-radius:4px; color:#4ade80;">tensorflowjs_converter --input_format=keras garbage_model_best.h5 ./tfjs_cnn</code><br>
+    <code
+      style="background:#0f1117; padding:2px 6px; border-radius:4px; color:#60a5fa;">tensorflowjs_converter --input_format=keras mobilenet_model_best.h5 ./tfjs_mobilenet</code><br><br>
+    Place both folders next to this HTML file. Update <code style="color:#4ade80;">CNN_MODEL_URL</code> and <code
+      style="color:#60a5fa;">MOBILE_MODEL_URL</code> in the script.
+  </div>
+
+  <script>
+    // ─── CONFIG ─────────────────────────────────────────────────────────────────
+    const CNN_MODEL_URL = './tfjs_cnn/garbage_model_final_architecture.json';       // <-- update after converting
+    const MOBILE_MODEL_URL = './tfjs_mobilenet/mobV2_garbage_model_final_architecture.json'; // <-- update after converting
+    const TUNED_MODEL_URL = './tfjs_mobilenet_tune/mobV2_garbage_modelV2withtune_final_architecture.json'; // use the tuned TF.js manifest file present in the folder
+
+    const CLASS_NAMES = ['battery', 'biological', 'cardboard', 'clothes', 'glass', 'metal', 'paper', 'plastic', 'shoes', 'trash'];
+
+    const TIPS = {
+      cardboard: '📦 <strong>Cardboard</strong> — Flatten boxes before recycling. Keep dry.',
+      glass: '🍶 <strong>Glass</strong> — Rinse containers. Glass is 100% recyclable.',
+      metal: '🥫 <strong>Metal</strong> — Rinse cans. Aluminum and steel are highly valuable.',
+      paper: '📄 <strong>Paper</strong> — Separate from food waste before recycling.',
+      plastic: '🧴 <strong>Plastic</strong> — Check the resin code (1–7) on the bottom.',
+      trash: '🗑️ <strong>General Trash</strong> — May not be recyclable. Use general waste bin.',
+      battery: '🔋 <strong>Battery</strong> — Needs special recycling. Never put in general trash.',
+      biological: '🧬 <strong>Biological</strong> — Dispose safely per local bio-waste guidelines.',
+      clothes: '👕 <strong>Clothes</strong> — Donate usable garments or recycle textile waste.',
+      shoes: '👟 <strong>Shoes</strong> — Often recyclable through special programs.'
+    };
+
+    const EMOJIS = {
+      battery: '🔋', biological: '🧬', cardboard: '📦',
+      clothes: '👕', glass: '🍶', metal: '🥫',
+      paper: '📄', plastic: '🧴', shoes: '👟', trash: '🗑️'
+    };
+
+    // ─── STATE ──────────────────────────────────────────────────────────────────
+    let cnnModel = null;
+    let mobileModel = null;
+    let tunedModel = null;
+    let activeModel = null;   // 'cnn' | 'mobilenet' | 'tuned'
+    let modelReady = { cnn: false, mobilenet: false, tuned: false };
+    let selectedFile = null;
+
+    // ─── ELEMENTS ───────────────────────────────────────────────────────────────
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const previewWrap = document.getElementById('preview-wrap');
+    const previewImg = document.getElementById('preview-img');
+    const imgLabel = document.getElementById('img-label');
+    const classifyBtn = document.getElementById('classify-btn');
+    const statusEl = document.getElementById('status');
+    const resultsCard = document.getElementById('results-card');
+    const resultEmoji = document.getElementById('result-emoji');
+    const resultLabel = document.getElementById('result-label');
+    const resultConf = document.getElementById('result-conf');
+    const resultModelTag = document.getElementById('result-model-tag');
+    const barList = document.getElementById('bar-list');
+    const tipBox = document.getElementById('tip-box');
+    const statusDot = document.getElementById('status-dot');
+    const modelStatusText = document.getElementById('model-status-text');
+
+    // ─── MODEL SELECTION ────────────────────────────────────────────────────────
+    async function selectModel(which) {
+      activeModel = which;
+
+      document.getElementById('btn-cnn').className = 'model-btn' + (which === 'cnn' ? ' active-cnn' : '');
+      document.getElementById('btn-mobile').className = 'model-btn' + (which === 'mobilenet' ? ' active-mobile' : '');
+      document.getElementById('btn-tuned').className = 'model-btn' + (which === 'tuned' ? ' active-tuned' : '');
+
+      resultsCard.style.display = 'none';
+      statusEl.textContent = '';
+      classifyBtn.disabled = true;
+
+      if (which === 'cnn') {
+        classifyBtn.textContent = 'CLASSIFY WITH CNN';
+        modelReady.cnn = !!cnnModel;
+
+        if (!cnnModel) {
+          modelStatusText.textContent = 'Loading Custom CNN...';
+          statusDot.className = 'dot';
+
+          try {
+            cnnModel = await tf.loadLayersModel(CNN_MODEL_URL);
+            modelReady.cnn = true;
+            statusDot.className = 'dot ready';
+            modelStatusText.textContent = 'Custom CNN ready';
+          } catch (e) {
+            modelReady.cnn = false;
+            modelStatusText.textContent = 'CNN failed to load';
+            console.warn(e);
+          }
+        }
+      }
+
+      else if (which === 'mobilenet') {
+        classifyBtn.textContent = 'CLASSIFY WITH MOBILENETV2';
+        modelReady.mobilenet = !!mobileModel;
+
+        if (!mobileModel) {
+          modelStatusText.textContent = 'Loading MobileNetV2...';
+          statusDot.className = 'dot';
+
+          try {
+            mobileModel = await tf.loadLayersModel(MOBILE_MODEL_URL);
+            modelReady.mobilenet = true;
+            statusDot.className = 'dot ready-mobile';
+            modelStatusText.textContent = 'MobileNetV2 ready';
+          } catch (e) {
+            modelReady.mobilenet = false;
+            modelStatusText.textContent = 'MobileNet failed to load';
+            console.warn(e);
+          }
+        }
+      }
+
+      else if (which === 'tuned') {
+        classifyBtn.textContent = 'CLASSIFY WITH TUNED MODEL';
+        modelReady.tuned = !!tunedModel;
+
+        if (!tunedModel) {
+          modelStatusText.textContent = 'Loading Tuned Model...';
+          statusDot.className = 'dot';
+
+          try {
+            tunedModel = await tf.loadLayersModel(TUNED_MODEL_URL);
+            modelReady.tuned = true;
+            statusDot.style.background = '#f472b6';
+            statusDot.style.animation = 'none';
+            modelStatusText.textContent = 'Tuned model ready';
+          } catch (e) {
+            modelReady.tuned = false;
+            modelStatusText.textContent = 'Tuned model failed to load';
+            console.warn(e);
+          }
+        }
+      }
+
+      classifyBtn.disabled = !selectedFile || !modelReady[which];
+    }
+
+    // ─── FILE HANDLING ──────────────────────────────────────────────────────────
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault(); dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) handleFile(file);
+    });
+    fileInput.addEventListener('change', (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+    function handleFile(file) {
+      selectedFile = file;
+      previewImg.src = URL.createObjectURL(file);
+      previewWrap.style.display = 'block';
+      imgLabel.textContent = `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
+      resultsCard.style.display = 'none';
+      statusEl.textContent = '';
+      classifyBtn.disabled = !activeModel || !modelReady[activeModel];
+      if (!activeModel) classifyBtn.textContent = 'SELECT A MODEL FIRST';
+    }
+
+    // ─── CLASSIFY ───────────────────────────────────────────────────────────────
+    classifyBtn.addEventListener('click', async () => {
+      if (!selectedFile || !activeModel) return;
+
+      classifyBtn.disabled = true;
+      statusEl.innerHTML = '<span class="spinner"></span>Classifying...';
+      resultsCard.style.display = 'none';
+
+      await new Promise(r => setTimeout(r, 50));
+
+      try {
+        let probs;
+        let currentModel;
+        if (activeModel === 'cnn') currentModel = cnnModel;
+        else if (activeModel === 'mobilenet') currentModel = mobileModel;
+        else if (activeModel === 'tuned') currentModel = tunedModel;
+
+        if (currentModel) {
+          const tensor = tf.tidy(() =>
+            tf.browser.fromPixels(previewImg)
+              .resizeBilinear([224, 224])
+              .toFloat().div(255.0).expandDims(0)
+          );
+          const pred = currentModel.predict(tensor);
+          probs = await pred.data();
+          tensor.dispose(); pred.dispose();
+        } else {
+          statusEl.textContent = 'Model not loaded. Please select a model again.';
+          classifyBtn.disabled = false;
+          return;
+        }
+
+        showResults(probs, activeModel);
+        statusEl.textContent = '';
+      } catch (err) {
+        statusEl.textContent = 'Error during classification. Check console.';
+        console.error(err);
+      }
+
+      classifyBtn.disabled = false;
+    });
+
+    // ─── DISPLAY RESULTS ────────────────────────────────────────────────────────
+    function showResults(probs, which) {
+      let colorClass = 'mobile';
+      if (which === 'cnn') colorClass = 'cnn';
+      else if (which === 'tuned') colorClass = 'tuned';
+      const indexed = CLASS_NAMES.map((name, i) => ({ name, prob: probs[i] }));
+      indexed.sort((a, b) => b.prob - a.prob);
+      const top = indexed[0];
+
+      // Model tag
+      resultModelTag.textContent =
+        which === 'cnn' ? 'Custom CNN' :
+          which === 'mobilenet' ? 'MobileNetV2' :
+            'MobileNetV2 Tuned';
+      resultModelTag.className = `result-model-tag ${colorClass}`;
+
+      resultEmoji.textContent = EMOJIS[top.name] || '♻️';
+      resultLabel.textContent = top.name;
+      resultLabel.className = `result-label ${colorClass}`;
+      resultConf.textContent = `${(top.prob * 100).toFixed(1)}%`;
+
+      tipBox.className = `tip-box ${colorClass}`;
+      const tipText = TIPS[top.name] || '';
+      tipBox.innerHTML = tipText.replace('<strong>', `<strong class="${colorClass}">`);
+
+      barList.innerHTML = '';
+      indexed.forEach((item, rank) => {
+        const pct = (item.prob * 100).toFixed(1);
+        const fillClass = rank === 0 ? `top-${colorClass}` : rank <= 2 ? 'mid' : 'low';
+        barList.innerHTML += `
+        <div class="bar-item">
+          <div class="bar-header">
+            <span class="bar-name">${EMOJIS[item.name]} ${item.name}</span>
+            <span class="bar-pct">${pct}%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill ${fillClass}" style="width:0%" data-target="${pct}"></div>
+          </div>
+        </div>`;
+      });
+
+      resultsCard.style.display = 'block';
+      requestAnimationFrame(() => {
+        document.querySelectorAll('.bar-fill').forEach(bar => {
+          bar.style.width = bar.dataset.target + '%';
+        });
+      });
+    }
+  </script>
+
+</body>
+
+</html>
